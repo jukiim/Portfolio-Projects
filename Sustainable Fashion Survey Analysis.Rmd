@@ -2,7 +2,7 @@
 title: "Sustainable Fashion Survey Analysis"
 author: "Ju Kim (4156998)"
 date: "2024-11-06"
-output: rmarkdown::github_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
