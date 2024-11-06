@@ -1,0 +1,226 @@
+---
+title: "Sustainable Fashion Survey Analysis"
+author: "Ju Kim (4156998)"
+date: "2024-11-06"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+- import libraries
+```{r}
+rm(list=ls())
+library(tidyverse)
+library(lubridate)
+library(dplyr)
+library(magrittr)
+library(readr)
+library(ggplot2)
+library(tidyr)
+library(janitor)
+library(readxl)
+library(reshape)
+```
+
+- setting working directory and viewing dataset
+```{r}
+setwd("~/Desktop/projects/sustainable fashion project")
+fashion <- read_excel("fashion_survey.xlsx")
+#View(fashion)
+```
+
+- cleaning data
+```{r}
+fashion <- fashion %>%
+  clean_names()
+
+#glimpse(fashion)
+unique(fashion$age)
+unique(fashion$gender)
+
+#changing data type as factor for gender column
+fashion$gender <- as.factor(fashion$gender)
+class(fashion$gender)
+
+#change 'NB' in gender column to 'NA'
+fashion$gender[fashion$gender == "NB"] <- "NA"
+nrow(fashion)
+#####
+
+#####
+# age range frequency
+age <- data.frame(fashion$age)
+age_separated <- age %>%
+  mutate(row_id = row_number()) %>%
+  clean_names()
+
+#age_separated
+
+age_frequency <- table(age_separated$fashion_age)
+#print(age_frequency)
+```
+- EDA
+```{r}
+# plotting age range of participants
+age_freq_df <- as.data.frame(age_frequency)
+
+ggplot(age_freq_df, aes(x=Var1, y=Freq)) +
+  geom_bar(stat = "identity", fill = "lightblue") +
+  labs(title = "Participants' Age Range", x = "Age Range", y = "Number of Participants")
+```
+Respondents' ages ranged from 18-64, with the 18-24 age category reporting the highest number of respondents.
+
+```{r}
+#plotting participant frequency per age range and occupation
+fashion %>%
+  mutate(age = factor(age, ordered = TRUE, levels = c("18-24", "25-34", "35-44", "45-54", "55-64"))) %>%
+  ggplot(aes(x=age, fill = occupation)) +
+  geom_bar(position = "dodge", color = "black") + 
+  labs(title = "Age and Occupation of Participants", x = "Age Range", y = "Number of Participants", fill = "Occupation")
+```
+The most common occupation for respondents consisted of a stable full-time job, with the next most common occupation being part-time employees and students for the younger respondents.
+
+```{r}
+#plotting participant frequency per age range and sustainable shopping frequency
+fashion %>%
+  mutate(age = factor(age, ordered = TRUE, levels = c("18-24", "25-34", "35-44", "45-54", "55-64"))) %>%
+  ggplot(aes(x=age, fill = sustainable_shopping_frequency)) +
+  geom_bar(position = "dodge", color = "black") + 
+  labs(title = "Sustainable Shopping Frequency per Age Range", x = "Age Range", y = "Number of Participants", fill = "Sustainable Shopping")
+```
+From this graph, an overwhelming number of respondents 'rarely' shop sustainably with 'sometimes' being the next most frequent answer to the "Do you shop sustainbly?" question. 
+
+```{r}
+#group by age,then show mean knowledge, environmental awareness, importance, 
+
+factors <- data.frame(fashion %>%
+  select(age, knowledge_on_sustainable_fashion, environmental_awareness, importance_of_sustainability))
+#factors
+
+factors_melt <- factors %>%
+  melt(id.vars = "age")
+names(factors_melt) <- c("age", "factor", "scale")
+
+head(factors_melt)
+
+factors_melt %>%
+  mutate(Age = factor(age, ordered = TRUE, levels = c("18-24", "25-34", "35-44", "45-54", "55-64"))) %>%
+  ggplot(aes(x=age, y= scale, fill = factor)) +
+  scale_y_continuous(limits = c(0,6), breaks = c(0:6, 0.5)) +
+  geom_bar(position = "dodge", stat = "summary", fun = "mean") +
+  labs(title = "Sustainability Awareness in Participants", x = "Age Range", y = "1-10 Scale", fill = "Factors")
+```
+There is no clear difference in scale for the different age demographics on their knowledge on sustainable fashion, environmental awareness, or the importance of sustainaibility. Each age group averaged around 5 or below for each factor, revealing neutrality for these variables. 
+```{r}
+#group by occupation
+
+occupation <- data.frame(fashion$occupation) %>%
+  mutate(row_id = row_number()) %>%
+  clean_names()
+
+occupation_freq <- table(occupation$fashion_occupation)
+occupation_freq
+
+occupation_df <- as.data.frame(occupation_freq)
+names(occupation_df) <- c("Occupation", "Frequency")
+
+occupation_df <- occupation_df %>% arrange(desc(Frequency))
+
+library(RColorBrewer)
+pie(occupation_df$Frequency, labels = occupation_df$Occupation)
+```
+
+```{r}
+#group by sustainable shopping frequency
+ssf <- data.frame(fashion$sustainable_shopping_frequency) %>%
+  mutate(row_id = row_number()) %>%
+  clean_names()
+
+sustainable_shopping_freq <- table(ssf$fashion_sustainable_shopping_frequency)  
+sustainable_shopping_df <- as.data.frame(sustainable_shopping_freq)
+sustainable_shopping_df <- sustainable_shopping_df %>%
+  arrange(desc(Freq))
+names(sustainable_shopping_df) <- c("Sustainable Shopping", "Frequency")
+
+pie(sustainable_shopping_df$Frequency, labels = sustainable_shopping_df$`Sustainable Shopping`,
+    main = "Sustainable Shopping Frequency of Respondents")
+```
+```{r}
+#group by occupation AND sustainable shopping frequency
+
+occupation_ssf <- fashion %>%
+  select(occupation, sustainable_shopping_frequency)
+
+head(occupation_ssf) #missing data
+
+occupation_ssf <- drop_na(occupation_ssf) #drop na values
+
+head(occupation_ssf)
+
+occupation_ssf_freq <- occupation_ssf %>%
+  count(occupation, sustainable_shopping_frequency) #count per subgroup
+
+occupation_ssf_freq <- occupation_ssf_freq %>% arrange(desc(n)) #arrange by desc order
+
+head(occupation_ssf_freq)
+
+#install.packages("waffle")
+#install.packages("ggtext")
+#install.packages("showtext")
+library(showtext)
+library(ggtext)
+library(waffle)
+
+waf <- ggplot(occupation_ssf_freq, aes(fill=sustainable_shopping_frequency, values = n)) +
+  geom_waffle(color = "white", size = .25, n_rows = 10, flip = TRUE, make_proportional = TRUE) +
+  facet_wrap(~occupation, nrow = 1, strip.position = "bottom") +
+  scale_x_discrete() +
+  scale_y_continuous(labels = function(x) x * 10,
+                     expand = c(0,0)) +
+  labs(title = "Sustainable Shopping Frequency Based on Occupation") +
+  theme_minimal() + 
+  theme(
+    legend.position = "top",
+    legend.title = element_blank()
+  )
+
+waf
+```
+The most notable difference from this waffle chart would be the smaller frequency of shoppers who "always" shop sustainably from the 'Freelancer' category. It's important to note that the biggest sustainable shopper demographic - who responded "always" - is from the 'Student' category. 
+
+```{r}
+###### mapping
+#install.packages("sf")
+library("sf")
+#install.packages("rnaturalearth")
+library(rnaturalearth)
+#install.packages("rnaturalearthdata")
+library(rnaturalearthdata)
+
+world <- ne_countries(scale="medium", returnclass = "sf")
+
+ggplot(data=world) + geom_sf()
+
+view(world)
+
+country <- data.frame(fashion$country)
+country_list <- country %>%
+  mutate(row_id = row_number())
+country_count <- table(country_list$fashion.country)
+print(country_count)
+
+country_df <- data.frame(country_count)
+names(country_df) <- c("postal", "frequency")
+
+fashion_world <- merge(x = world, y=country_df, by="postal",
+                       all.x = TRUE)
+view(fashion_world)
+
+ggplot(data=fashion_world) + geom_sf(aes(fill=frequency)) +
+  labs(fill = "Response Frequency") +
+  theme(legend.position = "bottom") +
+  theme_void()
+```
+This map visualizes where the responses were collected from, with the highest number of respondents being from the U.S.
